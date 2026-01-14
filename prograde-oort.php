@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Plugin Name: Prograde Oort
@@ -19,13 +20,14 @@ if (!defined('WPINC')) {
 // PHP 8.2+ Check
 if (version_compare(PHP_VERSION, '8.2.0', '<')) {
     add_action('admin_notices', function () {
-        echo '<div class="error"><p>Prograde Oort requires PHP 8.2.0 or higher. Current version: ' . PHP_VERSION . '</p></div>';
+        $message = sprintf(
+            /* translators: %s: Current PHP version */
+            __('Prograde Oort requires PHP 8.2.0 or higher. Current version: %s', 'prograde-oort'),
+            PHP_VERSION
+        );
+        echo '<div class="error"><p>' . esc_html($message) . '</p></div>';
     });
     return;
-}
-
-if (! defined('ABSPATH')) {
-    exit;
 }
 
 // Define plugin constants
@@ -37,12 +39,17 @@ if (!defined('PROGRADE_OORT_URL')) {
 }
 
 // Use Composer Autoloader
-if (file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once __DIR__ . '/vendor/autoload.php';
+if (file_exists(PROGRADE_OORT_PATH . 'vendor/autoload.php')) {
+    require_once PROGRADE_OORT_PATH . 'vendor/autoload.php';
 }
 
-// Initialize the plugin with a safety guard
+/**
+ * Initialize the plugin after all plugins are loaded.
+ */
 add_action('plugins_loaded', function () {
+    // Load text domain
+    load_plugin_textdomain('prograde-oort', false, dirname(plugin_basename(__FILE__)) . '/languages');
+
     if (class_exists('\ProgradeOort\Core\Bootstrap')) {
         \ProgradeOort\Core\Bootstrap::instance();
     }

@@ -45,7 +45,7 @@ class ScfMetaboxes
                 <?php _e('Advanced Custom Fields (ACF) or Secure Custom Fields is required for endpoint configuration. Please install and activate it.', 'prograde-oort'); ?>
             </p>
             <p>
-                <a href="<?php echo admin_url('plugin-install.php?s=advanced+custom+fields&tab=search&type=term'); ?>" class="button button-primary">
+                <a href="<?php echo esc_url(admin_url('plugin-install.php?s=advanced+custom+fields&tab=search&type=term')); ?>" class="button button-primary">
                     <?php _e('Install ACF Now', 'prograde-oort'); ?>
                 </a>
             </p>
@@ -61,47 +61,47 @@ class ScfMetaboxes
 
         acf_add_local_field_group([
             'key'    => 'group_oort_endpoint_settings',
-            'title'  => 'Endpoint Settings',
+            'title'  => __('Endpoint Settings', 'prograde-oort'),
             'fields' => [
                 [
                     'key'     => 'field_oort_route_type',
-                    'label'   => 'Route Type',
-                    'name'    => 'oort_route_type',
+                    'label'   => __('Route Type', 'prograde-oort'),
+                    'name'    => '_oort_route_type',
                     'type'    => 'select',
                     'choices' => [
-                        'rest' => 'REST API Endpoint',
-                        'path' => 'Custom Path Dispatcher',
+                        'rest' => __('REST API Endpoint', 'prograde-oort'),
+                        'path' => __('Custom Path Dispatcher', 'prograde-oort'),
                     ],
                     'default_value' => 'rest',
                 ],
                 [
                     'key'   => 'field_oort_route_path',
-                    'label' => 'Route Path',
-                    'name'  => 'oort_route_path',
+                    'label' => __('Route Path', 'prograde-oort'),
+                    'name'  => '_oort_route_path',
                     'type'  => 'text',
-                    'instructions' => 'e.g., /webhook/my-flow or my-path',
+                    'instructions' => __('e.g., /webhook/my-flow or my-path', 'prograde-oort'),
                     'required' => 1,
                 ],
                 [
                     'key'     => 'field_oort_trigger',
-                    'label'   => 'Trigger Event',
-                    'name'    => 'oort_trigger',
+                    'label'   => __('Trigger Event', 'prograde-oort'),
+                    'name'    => '_oort_trigger',
                     'type'    => 'select',
                     'choices' => [
-                        'webhook' => 'Incoming Webhook',
-                        'ingestion' => 'Feed Ingestion Runner',
-                        'event' => 'Internal Event (Post Save/Login)',
-                        'manual' => 'Manual / API Call only',
+                        'webhook' => __('Incoming Webhook', 'prograde-oort'),
+                        'ingestion' => __('Feed Ingestion Runner', 'prograde-oort'),
+                        'event' => __('Internal Event (Post Save/Login)', 'prograde-oort'),
+                        'manual' => __('Manual / API Call only', 'prograde-oort'),
                     ],
                     'default_value' => 'webhook',
                 ],
                 [
                     'key'   => 'field_oort_logic',
-                    'label' => 'Automation Logic (PHP)',
-                    'name'  => 'oort_logic',
+                    'label' => __('Automation Logic (Expression Language / PHP)', 'prograde-oort'),
+                    'name'  => '_oort_logic',
                     'type'  => 'textarea',
                     'rows'  => 20,
-                    'instructions' => 'Enter PHP code without <?php tag. Variable $data contains payload.',
+                    'instructions' => __('Enter expression logic (safe) or PHP code (if enabled). Variable $params contains payload.', 'prograde-oort'),
                 ],
             ],
             'location' => [

@@ -122,23 +122,23 @@ class PortabilityPage
         $export_json = Portability::export_all();
 ?>
         <div class="wrap">
-            <h1>Oort Portability (Import/Export)</h1>
+            <h1><?php _e('Oort Portability (Import/Export)', 'prograde-oort'); ?></h1>
             <?php settings_errors('oort_portability'); ?>
 
             <div class="card">
-                <h2>Export Configurations</h2>
-                <p>Copy this JSON to migrate your endpoints to another site.</p>
+                <h2><?php _e('Export Configurations', 'prograde-oort'); ?></h2>
+                <p><?php _e('Copy this JSON to migrate your endpoints to another site.', 'prograde-oort'); ?></p>
                 <textarea class="large-text code" rows="10" readonly><?php echo esc_textarea($export_json); ?></textarea>
             </div>
 
             <div class="card">
-                <h2>Import Configurations</h2>
-                <p>Paste Oort JSON here to import endpoints.</p>
+                <h2><?php _e('Import Configurations', 'prograde-oort'); ?></h2>
+                <p><?php _e('Paste Oort JSON here to import endpoints.', 'prograde-oort'); ?></p>
                 <form method="post" action="">
                     <?php wp_nonce_field('oort_portability_action', 'oort_portability_nonce'); ?>
-                    <textarea name="import_data" class="large-text code" rows="10" placeholder="Paste JSON here..."></textarea>
+                    <textarea name="import_data" class="large-text code" rows="10" placeholder="<?php esc_attr_e('Paste JSON here...', 'prograde-oort'); ?>"></textarea>
                     <p class="submit">
-                        <input type="submit" name="oort_import" class="button button-primary" value="Import Endpoints">
+                        <input type="submit" name="oort_import" class="button button-primary" value="<?php esc_attr_e('Import Endpoints', 'prograde-oort'); ?>">
                     </p>
                 </form>
             </div>

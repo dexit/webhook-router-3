@@ -1,16 +1,29 @@
 <?php
+declare(strict_types=1);
 
 namespace ProgradeOort\Automation;
 
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 
+/**
+ * Automation Engine for executing custom logic.
+ * Supports Symfony Expression Language (safe) and legacy PHP (restricted).
+ */
 class Engine
 {
-    private static $instance = null;
-    private $expressionLanguage;
-    private $allowEval = false; // Feature flag for eval() - disabled by default
+    /** @var self|null Singleton instance */
+    private static ?self $instance = null;
+    
+    /** @var ExpressionLanguage Symfony Expression Language instance */
+    private ExpressionLanguage $expressionLanguage;
+    
+    /** @var bool Whether eval() execution is allowed */
+    private bool $allowEval = false;
 
-    public static function instance()
+    /**
+     * Get the singleton instance.
+     */
+    public static function instance(): self
     {
         if (is_null(self::$instance)) {
             self::$instance = new self();
@@ -18,13 +31,16 @@ class Engine
         return self::$instance;
     }
 
+    /**
+     * Constructor initializes the expression language and checks settings.
+     */
     private function __construct()
     {
         $this->expressionLanguage = new ExpressionLanguage();
+        $this->expressionLanguage->registerProvider(new LogicProvider());
 
-        // PHP execution enabled by default with security enhancements
-        // Can be disabled via filter if expression-only mode is preferred
-        $this->allowEval = apply_filters('prograde_oort_allow_eval', true);
+        // PHP execution disabled by default with security enhancements
+        $this->allowEval = (bool) apply_filters('prograde_oort_allow_eval', false);
 
         if (!$this->allowEval) {
             \ProgradeOort\Log\Logger::instance()->info(
@@ -35,81 +51,74 @@ class Engine
         }
     }
 
-    public function run_flow($flow_id, $data, $custom_logic = null)
+    /**
+     * Run an automation flow.
+     *
+     * @param string $flow_id Unique identifier for the flow.
+     * @param array<string, mixed> $data Input data for the flow.
+     * @param string|null $custom_logic The logic to execute.
+     * @return array<string, mixed> Execution result.
+     */
+    public function run_flow(string $flow_id, array $data, ?string $custom_logic = null): array
     {
         \ProgradeOort\Log\Logger::instance()->info("Running flow: {$flow_id}", $data);
 
         // If logic is not provided, try to find it in options (backward compatibility)
         if (is_null($custom_logic)) {
-            $custom_logic = get_option("prograde_oort_flow_{$flow_id}", '');
+            $custom_logic = (string) get_option("prograde_oort_flow_{$flow_id}", '');
         }
 
-        if ($custom_logic) {
-            return $this->execute_custom_logic($custom_logic, $data);
+        // Logic check
+        if (is_null($custom_logic) || trim($custom_logic) === '') {
+            return ['status' => 'success', 'result' => $data];
         }
 
-        return ['status' => 'success', 'message' => 'Flow executed (no custom logic)'];
-    }
-
-    private function execute_custom_logic($code, $data)
-    {
-        // Check if this is PHP code (starts with <?php) or expression syntax
-        $isPHP = (strpos(trim($code), '<?php') === 0);
-
-        if ($isPHP && $this->allowEval) {
-            return $this->execute_php_legacy($code, $data);
-        } elseif ($isPHP) {
-            // PHP code provided but eval is disabled
-            \ProgradeOort\Log\Logger::instance()->error(
-                "Cannot execute PHP code: eval() is disabled for security. Use expression syntax instead.",
-                ['flow_code' => substr($code, 0, 100)],
-                'execution'
-            );
-            return [
-                'status' => 'error',
-                'message' => 'PHP code execution is disabled. Use expression syntax or enable legacy mode (not recommended).'
-            ];
-        }
-
-        // Execute as safe expression
-        return $this->execute_expression($code, $data);
-    }
-
-    /**
-     * Execute code using safe Symfony Expression Language
-     * Supports: variables, operators, functions, but NO arbitrary code execution
-     */
-    private function execute_expression($expression, $data)
-    {
-        try {
-            // Register safe helper functions
-            $this->registerSafeFunctions();
-
-            // Validate expression length (prevent DoS)
-            if (strlen($expression) > 10000) {
-                throw new \Exception('Expression too long (max 10000 characters)');
+        // Logic routing (Expression Language vs Legacy PHP)
+        if (strpos($custom_logic, '<?php') === 0) {
+            if (!$this->allowEval) {
+                return [
+                    'status' => 'error',
+                    'message' => 'PHP execution is disabled. Use Expression Language or enable legacy mode.'
+                ];
             }
+            return $this->execute_php_legacy($custom_logic, $data);
+        }
 
-            $result = $this->expressionLanguage->evaluate($expression, $data);
+        try {
+            // Execution context
+            $context = array_merge($data, [
+                'params' => $data,
+                'data' => $data,
+                'timestamp' => time()
+            ]);
+
+            $result = $this->expressionLanguage->evaluate($custom_logic, $context);
 
             return ['status' => 'success', 'result' => $result];
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
             \ProgradeOort\Log\Logger::instance()->error(
-                "Expression execution error",
-                ['error' => $e->getMessage(), 'expression' => substr($expression, 0, 200)],
+                "Automation logic failure in flow: {$flow_id}",
+                ['error' => $e->getMessage(), 'logic' => $custom_logic],
                 'execution'
             );
-            return ['status' => 'error', 'message' => $e->getMessage()];
+
+            return [
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ];
         }
     }
 
     /**
-     * Legacy eval() execution - ONLY if explicitly enabled
-     * @deprecated Use expression syntax instead
+     * Restricted execution of legacy PHP code.
+     * Uses pseudo-isolation and explicit capability checks.
+     *
+     * @param string $code Raw PHP code.
+     * @param array<string, mixed> $data Context data.
+     * @return array<string, mixed>
      */
-    private function execute_php_legacy($code, $data)
+    private function execute_php_legacy(string $code, array $data): array
     {
-        // Additional security checks for legacy mode
         if (!current_user_can('manage_options')) {
             return [
                 'status' => 'error',
@@ -118,14 +127,24 @@ class Engine
         }
 
         try {
-            // Sanitize data before extraction
-            $sanitized_data = array_map(function ($value) {
-                return is_string($value) ? sanitize_text_field($value) : $value;
-            }, $data);
+            // Sanitize data keys to prevent overwriting internal variables during extract()
+            $safe_data = [];
+            foreach ($data as $key => $value) {
+                $safe_key = preg_replace('/[^a-zA-Z0-9_]/', '', (string)$key);
+                if ($safe_key !== '' && !in_array($safe_key, ['code', 'data', 'safe_data', 'e', 'result'])) {
+                    $safe_data[$safe_key] = is_string($value) ? sanitize_text_field($value) : $value;
+                }
+            }
 
-            extract($sanitized_data);
+            extract($safe_data, EXTR_SKIP);
 
-            $result = eval('?>' . $code);
+            // Execute in an isolated scope (pseudo-isolation via Closure)
+            $executor = function() use ($code, $safe_data) {
+                extract($safe_data, EXTR_SKIP);
+                return eval('?>' . $code);
+            };
+
+            $result = $executor();
 
             return ['status' => 'success', 'result' => $result];
         } catch (\Throwable $e) {
@@ -136,33 +155,5 @@ class Engine
             );
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
-    }
-
-    /**
-     * Register safe functions for expression language
-     */
-    private function registerSafeFunctions()
-    {
-        // Log function
-        $this->expressionLanguage->register('log', function ($str) {
-            return sprintf('\ProgradeOort\Log\Logger::instance()->info(%s)', $str);
-        }, function ($arguments, $message) {
-            \ProgradeOort\Log\Logger::instance()->info($message, [], 'execution');
-            return $message;
-        });
-
-        // JSON encode
-        $this->expressionLanguage->register('json', function ($str) {
-            return sprintf('json_encode(%s)', $str);
-        }, function ($arguments, $data) {
-            return json_encode($data);
-        });
-
-        // String concatenation helper
-        $this->expressionLanguage->register('concat', function () {
-            return 'implode("", func_get_args())';
-        }, function ($arguments, ...$strings) {
-            return implode('', $strings);
-        });
     }
 }

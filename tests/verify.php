@@ -21,6 +21,8 @@ function apply_filters($tag, $value)
 {
     return $value;
 }
+function load_plugin_textdomain($domain, $abs_rel_path = false, $abs_path = false) { return true; }
+function plugin_basename($file) { return $file; }
 function do_action($tag, ...$args) {}
 function get_field($key, $post_id = false)
 {
@@ -36,7 +38,7 @@ function esc_textarea($text)
 }
 function plugin_dir_path($file)
 {
-    return __DIR__ . '/';
+    return dirname($file) . '/';
 }
 function plugin_dir_url($file)
 {
@@ -104,9 +106,18 @@ function as_enqueue_async_action($t, $args)
 {
     echo "Queued Action: $t\n";
 }
+function add_option($name, $value, $deprecated = '', $autoload = 'yes')
+{
+    echo "Added Option: $name\n";
+    return true;
+}
+function sanitize_text_field($text)
+{
+    return (string)$text;
+}
 
 // Load the plugin entry
-require_once __DIR__ . '/prograde-oort.php';
+require_once dirname(__DIR__) . '/prograde-oort.php';
 
 echo "--- PRODUCTION READINESS CHECK ---\n";
 

@@ -1,82 +1,68 @@
 <?php
+declare(strict_types=1);
 
 namespace ProgradeOort\Integration;
 
 /**
- * Pre-defined example configurations to showcase Guzzle, Action Scheduler, etc.
+ * Pre-defined example configurations to showcase Oort capabilities.
  */
 class Scenarios
 {
-    public static function register_examples()
+    /**
+     * Register example endpoints.
+     */
+    public static function register_examples(): void
     {
         // Use atomic add_option to prevent race conditions
-        // Returns false if option already exists
-        if (!add_option('prograde_oort_examples_installed', time(), '', 'no')) {
-            // Examples already installed
+        if (!add_option('prograde_oort_examples_installed', (string)time(), '', 'no')) {
             return;
         }
 
-        // 1. Example: Inbound Webhook Logging (Simple)
+        // 1. Example: Inbound Webhook Logging (Expression Language)
         self::create_endpoint(
             'Example: Generic Webhook',
             'webhook',
             'api/v1/log-it',
-            '<?php
-\ProgradeOort\Log\Logger::instance()->info("Received generic webhook", $params, "webhooks");
-return ["status" => "logged"];'
+            'log("Received generic webhook from " ~ (params.ip ?? "unknown"))'
         );
 
-        // 2. Example: Dynamic Dispatch (CPT -> 3rd Party via Guzzle)
-        // Uses Guzzle 7.x
+        // 2. Example: Dynamic Metadata (Logic Helpers)
         self::create_endpoint(
-            'Example: Dynamic Dispatcher',
-            'webhook',
-            'api/v1/dispatch',
-            '<?php
-use GuzzleHttp\Client;
-
-$client = new Client();
-$response = $client->post("https://httpbin.org/post", [
-    "json" => [
-        "source" => "Prograde Oort",
-        "payload" => $params
-    ]
-]);
-
-$body = json_decode($response->getBody(), true);
-\ProgradeOort\Log\Logger::instance()->info("Dispatched data to 3rd party", ["response" => $body], "execution");
-return $body;'
-        );
-
-        // 3. Example: Ingestion -> Logging (Action Scheduler)
-        self::create_endpoint(
-            'Example: Ingestion Trigger',
+            'Example: Metadata Update',
             'event',
-            'wp_login',
-            '<?php
-// Schedule an async task using Action Scheduler
-if (function_exists("as_enqueue_async_action")) {
-    as_enqueue_async_action("oort_ingestion_task", ["user_id" => $data["user_id"]]);
-    \ProgradeOort\Log\Logger::instance()->info("Scheduled ingestion task for user login", $data, "ingestion");
-}
-return ["status" => "scheduled"];'
+            'wp_insert_post',
+            'set_meta(data.post_id, "_oort_processed", timestamp)'
         );
 
-        update_option('prograde_oort_examples_installed', 1);
+        // 3. Example: Data Ingestion (Action Scheduler)
+        self::create_endpoint(
+            'Example: Async Task',
+            'event',
+            'oort_custom_event',
+            'log("Queueing async processing for " ~ (data.id ?? "none"))'
+        );
+
+        update_option('prograde_oort_examples_installed', '1');
     }
 
-    private static function create_endpoint($title, $type, $path, $code)
+    /**
+     * Helper to create an endpoint post.
+     */
+    private static function create_endpoint(string $title, string $type, string $path, string $code): int
     {
         $post_id = wp_insert_post([
-            'post_title' => $title,
+            'post_title' => sanitize_text_field($title),
             'post_type'  => 'oort_endpoint',
             'post_status' => 'publish'
         ]);
 
-        if ($post_id) {
-            update_post_meta($post_id, 'route_type', $type);
-            update_post_meta($post_id, 'route_path', $path);
-            update_post_meta($post_id, 'logic_code', $code);
+        if (is_int($post_id) && $post_id > 0) {
+            update_post_meta($post_id, '_oort_route_type', sanitize_text_field($type));
+            update_post_meta($post_id, '_oort_route_path', sanitize_text_field($path));
+            update_post_meta($post_id, '_oort_logic', $code);
+            return $post_id;
         }
+
+        return 0;
     }
 }

@@ -1,13 +1,24 @@
 <?php
+declare(strict_types=1);
 
 namespace ProgradeOort\Api;
 
+/**
+ * REST API and Custom Path Router.
+ * Handles incoming webhooks and dispatches them to the automation engine.
+ */
 class Router
 {
-    private static $instance = null;
-    private $paths = [];
+    /** @var self|null Singleton instance */
+    private static ?self $instance = null;
 
-    public static function instance()
+    /** @var array<string, callable> Registered custom paths */
+    private array $paths = [];
+
+    /**
+     * Get the singleton instance.
+     */
+    public static function instance(): self
     {
         if (is_null(self::$instance)) {
             self::$instance = new self();
@@ -15,61 +26,76 @@ class Router
         return self::$instance;
     }
 
+    /**
+     * Constructor registers WordPress hooks.
+     */
     private function __construct()
     {
         add_action('rest_api_init', [$this, 'register_rest_routes']);
         add_action('parse_request', [$this, 'dispatch_custom_paths']);
     }
 
-    public function register_rest_routes()
+    /**
+     * Register dynamic REST routes based on Oort Endpoints.
+     */
+    public function register_rest_routes(): void
     {
         $endpoints = get_posts([
             'post_type'      => 'oort_endpoint',
             'posts_per_page' => -1,
             'meta_query'     => [
                 [
-                    'key'   => 'oort_route_type',
+                    'key'   => '_oort_route_type',
                     'value' => 'rest',
                 ],
             ],
         ]);
 
         foreach ($endpoints as $endpoint) {
-            $path = get_field('oort_route_path', $endpoint->ID);
-            if (! $path) continue;
+            $path = get_post_meta($endpoint->ID, '_oort_route_path', true);
+            if (! $path || !is_string($path)) continue;
 
-            register_rest_route('prograde-oort/v1', $path, [
+            register_rest_route('prograde-oort/v1', ltrim($path, '/'), [
                 'methods'             => 'POST',
-                'callback'            => function ($request) use ($endpoint) {
+                'callback'            => function (\WP_REST_Request $request) use ($endpoint) {
                     return $this->handle_dynamic_rest($request, $endpoint);
                 },
-                'permission_callback' => '__return_true',
+                'permission_callback' => function (\WP_REST_Request $request) {
+                    return $this->check_auth($request);
+                },
             ]);
         }
     }
 
-    public function handle_dynamic_rest($request, $endpoint)
+    /**
+     * Handle incoming REST request for an Oort Endpoint.
+     */
+    public function handle_dynamic_rest(\WP_REST_Request $request, \WP_Post $endpoint): mixed
     {
-        // Check authentication and return error if it fails
-        $auth_result = $this->check_auth($request);
-        if (is_wp_error($auth_result)) {
-            return $auth_result;
+        $params = $request->get_json_params() ?? [];
+        $logic = get_post_meta($endpoint->ID, '_oort_logic', true);
+        
+        if (!is_string($logic)) {
+            $logic = '';
         }
-
-        $params = $request->get_json_params();
-        $logic = get_field('oort_logic', $endpoint->ID);
 
         \ProgradeOort\Log\Logger::instance()->info("Dynamic REST call: " . $endpoint->post_title, $params, 'webhooks');
 
         return \ProgradeOort\Automation\Engine::instance()->run_flow("endpoint_{$endpoint->ID}", $params, $logic);
     }
 
-    public function register_path($path, $callback)
+    /**
+     * Register a custom non-REST path.
+     */
+    public function register_path(string $path, callable $callback): void
     {
         $this->paths[trim($path, '/')] = $callback;
     }
 
-    public function dispatch_custom_paths($wp)
+    /**
+     * Dispatch custom paths from parse_request hook.
+     */
+    public function dispatch_custom_paths(\WP $wp): void
     {
         $request_path = trim($wp->request, '/');
         if (isset($this->paths[$request_path])) {
@@ -78,26 +104,29 @@ class Router
         }
     }
 
-    private function check_auth($request)
+    /**
+     * Check API key authentication.
+     *
+     * @param \WP_REST_Request $request
+     * @return bool|\WP_Error
+     */
+    private function check_auth(\WP_REST_Request $request): bool|\WP_Error
     {
         $api_key = $request->get_header('X-Prograde-Key');
         $stored_key = get_option('prograde_oort_api_key');
 
-        // Generate secure key on first access
         if (empty($stored_key)) {
             $stored_key = $this->generate_secure_key();
             update_option('prograde_oort_api_key', $stored_key);
 
-            // Log key generation for admin awareness
             \ProgradeOort\Log\Logger::instance()->warning(
                 'New API key generated. Please update your webhook clients.',
-                ['key_preview' => substr($stored_key, 0, 8) . '...'],
+                ['key_preview' => substr((string)$stored_key, 0, 8) . '...'],
                 'security'
             );
         }
 
-        // Constant-time comparison to prevent timing attacks
-        if (!hash_equals($stored_key, $api_key ?? '')) {
+        if (!is_string($api_key) || !hash_equals((string)$stored_key, $api_key)) {
             \ProgradeOort\Log\Logger::instance()->error(
                 'Unauthorized API access attempt blocked',
                 [
@@ -108,7 +137,6 @@ class Router
                 'security'
             );
 
-            // Return proper REST error response
             return new \WP_Error(
                 'rest_forbidden',
                 __('Invalid API key', 'prograde-oort'),
@@ -120,15 +148,14 @@ class Router
     }
 
     /**
-     * Generate cryptographically secure API key
+     * Generate cryptographically secure API key.
      */
-    private function generate_secure_key()
+    private function generate_secure_key(): string
     {
         if (function_exists('wp_generate_password')) {
             return wp_generate_password(64, true, true);
         }
 
-        // Fallback for non-WP environments
         return bin2hex(random_bytes(32));
     }
 }

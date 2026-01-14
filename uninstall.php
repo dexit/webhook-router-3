@@ -35,6 +35,7 @@ $options_to_delete = [
     'prograde_oort_examples_installed',
     'prograde_oort_api_key',
     'prograde_oort_version',
+    'prograde_oort_allow_eval',
     // Add any other options here
 ];
 
@@ -68,10 +69,12 @@ if (is_dir($log_dir)) {
 // 5. Delete transients
 $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_oort_%'");
 $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_oort_%'");
+$wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_prograde_oort_%'");
 
 // 6. Clean up scheduled events
 if (function_exists('as_unschedule_all_actions')) {
     // Clear Action Scheduler tasks
+    as_unschedule_all_actions('prograde_oort_process_batch');
     as_unschedule_all_actions('oort_ingestion_task');
     as_unschedule_all_actions('oort_cleanup');
 }

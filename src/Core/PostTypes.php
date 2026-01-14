@@ -54,5 +54,55 @@ class PostTypes
         ];
 
         register_post_type('oort_endpoint', $args);
+
+        // Custom columns in list table
+        add_filter('manage_oort_endpoint_posts_columns', [$this, 'set_oort_endpoint_columns']);
+        add_action('manage_oort_endpoint_posts_custom_column', [$this, 'render_oort_endpoint_columns'], 10, 2);
+        add_filter('manage_edit-oort_endpoint_sortable_columns', [$this, 'set_sortable_oort_endpoint_columns']);
+    }
+
+    public function set_oort_endpoint_columns($columns)
+    {
+        $new_columns = [];
+        foreach ($columns as $key => $value) {
+            $new_columns[$key] = $value;
+            if ($key === 'title') {
+                $new_columns['oort_type'] = __('Type', 'prograde-oort');
+                $new_columns['oort_path'] = __('Path', 'prograde-oort');
+                $new_columns['oort_trigger'] = __('Trigger', 'prograde-oort');
+            }
+        }
+        return $new_columns;
+    }
+
+    public function render_oort_endpoint_columns($column, $post_id)
+    {
+        switch ($column) {
+            case 'oort_type':
+                $type = get_post_meta($post_id, '_oort_route_type', true);
+                echo esc_html(strtoupper((string)($type ?: 'rest')));
+                break;
+            case 'oort_path':
+                $path = get_post_meta($post_id, '_oort_route_path', true);
+                echo '<code>/' . esc_html(ltrim((string)$path, '/')) . '</code>';
+                break;
+            case 'oort_trigger':
+                $trigger = get_post_meta($post_id, '_oort_trigger', true);
+                $choices = [
+                    'webhook' => __('Incoming Webhook', 'prograde-oort'),
+                    'ingestion' => __('Feed Ingestion', 'prograde-oort'),
+                    'event' => __('Internal Event', 'prograde-oort'),
+                    'manual' => __('Manual Call', 'prograde-oort'),
+                ];
+                echo esc_html($choices[$trigger] ?? ($trigger ?: 'webhook'));
+                break;
+        }
+    }
+
+    public function set_sortable_oort_endpoint_columns($columns)
+    {
+        $columns['oort_type'] = 'oort_type';
+        $columns['oort_path'] = 'oort_path';
+        return $columns;
     }
 }

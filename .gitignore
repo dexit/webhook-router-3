@@ -1,1 +1,17 @@
-node_modules
+# Composer
+/vendor/
+
+# Antigravity/Gemini
+/.gemini/
+/brain/
+
+# WordPress & Local Dev
+/tests/wp-content/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env

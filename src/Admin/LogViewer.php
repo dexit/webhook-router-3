@@ -23,26 +23,26 @@ class LogViewer
     {
         add_submenu_page(
             'prograde-oort',
-            'Log Viewer',
-            'Log Viewer',
+            __('Log Viewer', 'prograde-oort'),
+            __('Log Viewer', 'prograde-oort'),
             'manage_options',
-            'prograde-oort-logs',
+            'oort-logs',
             [$this, 'render_page']
         );
     }
 
     public function render_page()
     {
-        $channel = $_GET['channel'] ?? 'webhooks';
+        $channel = isset($_GET['channel']) ? sanitize_key($_GET['channel']) : 'webhooks';
         $logs = \ProgradeOort\Log\Logger::instance()->get_logs($channel);
 ?>
         <div class="wrap">
-            <h1>Prograde Oort Log Viewer</h1>
+            <h1><?php _e('Prograde Oort Log Viewer', 'prograde-oort'); ?></h1>
             <p>
-                <a href="?page=prograde-oort-logs&channel=webhooks" class="button <?php echo $channel === 'webhooks' ? 'button-primary' : ''; ?>">Webhooks</a>
-                <a href="?page=prograde-oort-logs&channel=execution" class="button <?php echo $channel === 'execution' ? 'button-primary' : ''; ?>">Execution</a>
-                <a href="?page=prograde-oort-logs&channel=ingestion" class="button <?php echo $channel === 'ingestion' ? 'button-primary' : ''; ?>">Ingestion</a>
-                <a href="?page=prograde-oort-logs&channel=security" class="button <?php echo $channel === 'security' ? 'button-primary' : ''; ?>">Security</a>
+                <a href="<?php echo esc_url(add_query_arg('channel', 'webhooks')); ?>" class="button <?php echo $channel === 'webhooks' ? 'button-primary' : ''; ?>"><?php _e('Webhooks', 'prograde-oort'); ?></a>
+                <a href="<?php echo esc_url(add_query_arg('channel', 'execution')); ?>" class="button <?php echo $channel === 'execution' ? 'button-primary' : ''; ?>"><?php _e('Execution', 'prograde-oort'); ?></a>
+                <a href="<?php echo esc_url(add_query_arg('channel', 'ingestion')); ?>" class="button <?php echo $channel === 'ingestion' ? 'button-primary' : ''; ?>"><?php _e('Ingestion', 'prograde-oort'); ?></a>
+                <a href="<?php echo esc_url(add_query_arg('channel', 'security')); ?>" class="button <?php echo $channel === 'security' ? 'button-primary' : ''; ?>"><?php _e('Security', 'prograde-oort'); ?></a>
             </p>
             <textarea readonly style="width: 100%; height: 600px; font-family: monospace; background: #272822; color: #f8f8f2; padding: 10px;"><?php echo esc_textarea($logs); ?></textarea>
         </div>

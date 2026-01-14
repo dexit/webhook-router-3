@@ -1,13 +1,26 @@
 <?php
+declare(strict_types=1);
 
 namespace ProgradeOort\Core;
 
+/**
+ * Main plugin bootstrap class.
+ * Handles component initialization and provides access to them.
+ */
 class Bootstrap
 {
-    private static $instance = null;
-    private $components = [];
+    /** @var self|null Singleton instance of the class */
+    private static ?self $instance = null;
 
-    public static function instance()
+    /** @var array<string, mixed> List of initialized components */
+    private array $components = [];
+
+    /**
+     * Get the singleton instance.
+     *
+     * @return self
+     */
+    public static function instance(): self
     {
         if (is_null(self::$instance)) {
             self::$instance = new self();
@@ -15,12 +28,20 @@ class Bootstrap
         return self::$instance;
     }
 
+    /**
+     * Constructor is private to enforce singleton pattern.
+     */
     private function __construct()
     {
         $this->init_components();
     }
 
-    private function init_components()
+    /**
+     * Initialize all plugin components.
+     *
+     * @return void
+     */
+    private function init_components(): void
     {
         $this->components['log'] = \ProgradeOort\Log\Logger::instance();
         $this->components['router'] = \ProgradeOort\Api\Router::instance();
@@ -33,6 +54,8 @@ class Bootstrap
         $this->components['portability'] = \ProgradeOort\Admin\PortabilityPage::instance();
         $this->components['post_types'] = \ProgradeOort\Core\PostTypes::instance();
         $this->components['metaboxes'] = \ProgradeOort\Integration\ScfMetaboxes::instance();
+        $this->components['queue'] = \ProgradeOort\Consumption\Queue::instance();
+        $this->components['pointers'] = \ProgradeOort\Admin\Pointers::instance();
 
         // Register Examples on initialization
         add_action('init', function () {
@@ -40,8 +63,14 @@ class Bootstrap
         });
     }
 
-    public function get_component($name)
+    /**
+     * Get a registered component by its name.
+     *
+     * @param string $name The component key.
+     * @return mixed|null The component instance or null if not found.
+     */
+    public function get_component(string $name): mixed
     {
-        return isset($this->components[$name]) ? $this->components[$name] : null;
+        return $this->components[$name] ?? null;
     }
 }

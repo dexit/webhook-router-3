@@ -22,6 +22,8 @@ function apply_filters($tag, $value)
 {
     return $value;
 }
+function load_plugin_textdomain($domain, $abs_rel_path = false, $abs_path = false) { return true; }
+function plugin_basename($file) { return $file; }
 function do_action($tag, ...$args) {}
 function get_field($key, $post_id = false)
 {
@@ -37,7 +39,7 @@ function esc_textarea($text)
 }
 function plugin_dir_path($file)
 {
-    return __DIR__ . '/';
+    return dirname($file) . '/';
 }
 function plugin_dir_url($file)
 {
@@ -213,7 +215,7 @@ if ($result['status'] === 'success') {
 }
 
 // Test PHP code blocked by default
-$result = $engine->run_flow('test_blocked', [], '<?php system("whoami");');
+$result = $engine->run_flow('test_blocked', [], '<?php @system("whoami");');
 if ($result['status'] === 'error' && strpos($result['message'], 'disabled') !== false) {
     echo "✓ PHP code execution properly blocked\n";
 } else {
@@ -308,9 +310,9 @@ echo "\n";
 
 //TEST 7: Verify Uninstall Script Exists
 echo "TEST 7: Cleanup Capabilities\n";
-if (file_exists(__DIR__ . '/uninstall.php')) {
+if (file_exists(dirname(__DIR__) . '/uninstall.php')) {
     echo "✓ Uninstall script exists\n";
-    $content = file_get_contents(__DIR__ . '/uninstall.php');
+    $content = file_get_contents(dirname(__DIR__) . '/uninstall.php');
     if (strpos($content, 'WP_UNINSTALL_PLUGIN') !== false) {
         echo "✓ Uninstall script properly secured\n";
     }
